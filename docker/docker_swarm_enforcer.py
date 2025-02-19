@@ -67,17 +67,23 @@ def update_service(service):
 
     print_timed(f"🔄 Updating {service_name}...")
 
+    if restart_delay == 0:
+        restart_delay = RESTART_DELAY
+
+    if update_delay == 0:
+        update_delay = UPDATE_DELAY
+
     # Build the update command with existing config
     update_params = {
         "restart_policy": {
             "Condition": service.attrs["Spec"]["TaskTemplate"].get("RestartPolicy", {}).get("Condition", "any"),
-            "Delay": RESTART_DELAY,
+            "Delay": restart_delay,
             "MaxAttempts": service.attrs["Spec"]["TaskTemplate"].get("RestartPolicy", {}).get("MaxAttempts", 0),
             "Window": service.attrs["Spec"]["TaskTemplate"].get("RestartPolicy", {}).get("Window", 10000000000),
         },
         "update_config": {
             "Parallelism": service.attrs["Spec"].get("UpdateConfig", {}).get("Parallelism", 1),
-            "Delay": UPDATE_DELAY,
+            "Delay": update_delay,
             "Order": service.attrs["Spec"].get("UpdateConfig", {}).get("Order", "stop-first"),
             "FailureAction": service.attrs["Spec"].get("UpdateConfig", {}).get("FailureAction", "pause"),
             "Monitor": service.attrs["Spec"].get("UpdateConfig", {}).get("Monitor", 5000000000),
