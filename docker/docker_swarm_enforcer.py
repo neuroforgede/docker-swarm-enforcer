@@ -10,7 +10,7 @@ MAX_FAILS_IN_A_ROW = 3
 def print_timed(msg):
     to_print = '{} [{}]: {}'.format(
         datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'docker_events',
+        'docker_swarm_enforcer',
         msg)
     print(to_print)
 
