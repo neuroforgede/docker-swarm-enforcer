@@ -1,4 +1,30 @@
 import docker
+from threading import Event
+import signal
+from datetime import datetime
+from typing import Any
+
+CHECK_INTERVAL = 60
+MAX_FAILS_IN_A_ROW = 3
+
+def print_timed(msg):
+    to_print = '{} [{}]: {}'.format(
+        datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'docker_events',
+        msg)
+    print(to_print)
+
+
+exit_event = Event()
+
+shutdown: bool = False
+def handle_shutdown(signal: Any, frame: Any) -> None:
+    print_timed(f"received signal {signal}. shutting down...")
+    exit_event.set()
+
+signal.signal(signal.SIGINT, handle_shutdown)
+signal.signal(signal.SIGTERM, handle_shutdown)
+
 
 # Desired settings
 # 10 seconds in nanoseconds
@@ -30,16 +56,16 @@ def update_service(service):
     restart_delay, update_delay = get_service_settings(service)
 
     if restart_delay != RESTART_DELAY and restart_delay > 0:
-        print(f"⚠️ {service_name}: Restart delay is already set to {restart_delay}.")
+        print_timed(f"⚠️ {service_name}: Restart delay is already set to {restart_delay}.")
 
     if update_delay != UPDATE_DELAY and update_delay > 0:
-        print(f"⚠️ {service_name}: Update delay is already set to {update_delay}.")
+        print_timed(f"⚠️ {service_name}: Update delay is already set to {update_delay}.")
 
     if restart_delay == RESTART_DELAY and update_delay == UPDATE_DELAY:
-        print(f"✅ {service_name}: Already set correctly. Skipping.")
+        print_timed(f"✅ {service_name}: Already set correctly. Skipping.")
         return    
 
-    print(f"🔄 Updating {service_name}...")
+    print_timed(f"🔄 Updating {service_name}...")
 
     # Build the update command with existing config
     update_params = {
@@ -64,27 +90,41 @@ def update_service(service):
             restart_policy=update_params["restart_policy"],
             update_config=update_params["update_config"]
         )
-        print(f"✅ {service_name}: Updated successfully.")
+        print_timed(f"✅ {service_name}: Updated successfully.")
     except Exception as e:
-        print(f"❌ Failed to update {service_name}: {e}")
+        print_timed(f"❌ Failed to update {service_name}: {e}")
 
 def main():
     """
     Main function to process all services in the Swarm.
     """
-    print("🔍 Checking services in Docker Swarm...")
-    
-    try:
-        services = client.services.list()
-        if not services:
-            print("⚠️ No services found.")
-            return
-        
-        for service in services:
-            update_service(service)
 
-    except Exception as e:
-        print(f"❌ Error: {e}")
+    fails_in_a_row = 0
+
+    while not exit_event.is_set():
+        print_timed("🔍 Checking services in Docker Swarm...")
+        
+        try:
+            services = client.services.list()
+            if not services:
+                print_timed("⚠️ No services found.")
+                return
+            
+            for service in services:
+                update_service(service)
+
+            print_timed("🔁 Done checking all services.")
+
+            fails_in_a_row = 0
+        except Exception as e:
+            print_timed(f"❌ Error: {e}")
+            fails_in_a_row += 1
+            if fails_in_a_row >= MAX_FAILS_IN_A_ROW:
+                print_timed("❌ Too many errors in a row. Exiting...")
+                exit_event.set()
+
+        print_timed(f"🕒 Waiting for {CHECK_INTERVAL} seconds...")
+        exit_event.wait(CHECK_INTERVAL)
 
 if __name__ == "__main__":
     main()
