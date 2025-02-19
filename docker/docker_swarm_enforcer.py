@@ -65,8 +65,6 @@ def update_service(service):
         print_timed(f"✅ {service_name}: Already set correctly. Skipping.")
         return    
 
-    print_timed(f"🔄 Updating {service_name}...")
-
     original_restart_delay = restart_delay
     original_update_delay = update_delay
 
@@ -79,6 +77,8 @@ def update_service(service):
     if original_restart_delay == restart_delay and original_update_delay == update_delay:
         print_timed(f"⚠️ {service_name}: No changes needed. Skipping.")
         return
+
+    print_timed(f"🔄 Updating {service_name}...")
 
     # Build the update command with existing config
     update_params = {
